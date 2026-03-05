@@ -1,0 +1,50 @@
+services:
+
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail.ramonbuzo.tech
+    restart: unless-stopped
+    ports:
+      - "25:25"     # SMTP (recibir de otros servidores)
+      - "465:465"   # SMTPS (enviar con SSL)
+      - "587:587"   # Submission (enviar con STARTTLS)
+      - "993:993"   # IMAPS (leer correo con SSL)
+    volumes:
+      - ./data/mail-data:/var/mail
+      - ./data/mail-state:/var/mail-state
+      - ./certs:/etc/letsencrypt:ro
+      - ./data/mail-logs:/var/log/mail
+      - ./data/config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=0          # Desactivado para ahorrar RAM
+      - ENABLE_FAIL2BAN=1
+      - SSL_TYPE=letsencrypt
+      - PERMIT_DOCKER=none
+      - SPOOF_PROTECTION=1
+      - POSTMASTER_ADDRESS=ramon@ramonbuzo.tech
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - proxy-network
+
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    container_name: roundcube
+    restart: unless-stopped
+    environment:
+      - ROUNDCUBEMAIL_DEFAULT_HOST=ssl://mail.ramonbuzo.tech
+      - ROUNDCUBEMAIL_DEFAULT_PORT=993
+      - ROUNDCUBEMAIL_SMTP_SERVER=tls://mail.ramonbuzo.tech
+      - ROUNDCUBEMAIL_SMTP_PORT=587
+      - ROUNDCUBEMAIL_DB_TYPE=sqlite
+    volumes:
+      - ./roundcube:/var/roundcube/db
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
